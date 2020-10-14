@@ -57,6 +57,7 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
     testImplementation 'junit:junit:4.13'
+    implementation project(path: ':curl')
 //    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 }
 

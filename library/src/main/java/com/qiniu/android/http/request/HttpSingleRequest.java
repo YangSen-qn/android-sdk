@@ -5,6 +5,7 @@ import com.qiniu.android.collect.ReportItem;
 import com.qiniu.android.collect.UploadInfoReporter;
 import com.qiniu.android.http.ResponseInfo;
 import com.qiniu.android.http.dns.DnsPrefetcher;
+//import com.qiniu.android.http.request.httpclient.LibcurlHttpClient;
 import com.qiniu.android.http.request.httpclient.SystemHttpClient;
 import com.qiniu.android.http.request.handler.CheckCancelHandler;
 import com.qiniu.android.http.request.handler.RequestProgressHandler;
@@ -13,8 +14,6 @@ import com.qiniu.android.http.metrics.UploadSingleRequestMetrics;
 import com.qiniu.android.storage.Configuration;
 import com.qiniu.android.storage.UpToken;
 import com.qiniu.android.storage.UploadOptions;
-import com.qiniu.android.utils.AsyncRun;
-import com.qiniu.android.utils.LogUtil;
 import com.qiniu.android.utils.Utils;
 
 import org.json.JSONObject;
@@ -71,6 +70,8 @@ class HttpSingleRequest {
         } else {
             client = new SystemHttpClient();
         }
+
+//        client = new LibcurlHttpClient();
 
         final CheckCancelHandler checkCancelHandler = new CheckCancelHandler() {
             @Override
