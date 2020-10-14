@@ -29,6 +29,11 @@ public class ExampleInstrumentedTest {
     @Test
     public void testCurl(){
 
+        CurlConfiguration.Builder builder = new CurlConfiguration.Builder();
+        builder.dnsResolverArray = new String[]{"www.baidu.com:442:61.135.169.121"};
+
+        CurlConfiguration curlConfiguration = builder.build();
+
         Curl curl = new Curl();
         long code = curl.globalInit();
 
@@ -70,7 +75,7 @@ public class ExampleInstrumentedTest {
             public void didFinishCollectingMetrics(CurlTransactionMetrics metrics) {
                 Log.i("Curl","====== didFinishCollectingMetrics metrics:" + metrics);
             }
-        }, null, "https://www.baidu.com", 1, null, null);
+        }, curlConfiguration, "https://www.baidu.com", 1, null, null);
 
 
     }

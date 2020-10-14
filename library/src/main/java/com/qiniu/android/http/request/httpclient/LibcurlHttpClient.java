@@ -8,11 +8,11 @@ import com.qiniu.android.http.request.IRequestClient;
 import com.qiniu.android.http.request.Request;
 import com.qiniu.android.utils.AsyncRun;
 import com.qiniu.android.utils.StringUtils;
-import com.yangsen.curl.Curl;
-import com.yangsen.curl.CurlConfiguration;
-import com.yangsen.curl.CurlHandlerI;
-import com.yangsen.curl.CurlResponse;
-import com.yangsen.curl.CurlTransactionMetrics;
+import com.qiniu.curl.Curl;
+import com.qiniu.curl.CurlConfiguration;
+import com.qiniu.curl.CurlHandlerI;
+import com.qiniu.curl.CurlResponse;
+import com.qiniu.curl.CurlTransactionMetrics;
 
 import org.json.JSONObject;
 

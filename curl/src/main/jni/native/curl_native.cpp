@@ -173,9 +173,9 @@ void initCurlRequestDefaultOptions(CURL *curl, struct CurlContext *curlContext, 
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 
-//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-//    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, CurlDebugCallback);
-//    curl_easy_setopt(curl, CURLOPT_DEBUGDATA, curlContext);
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, CurlDebugCallback);
+    curl_easy_setopt(curl, CURLOPT_DEBUGDATA, curlContext);
 
     qn_curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, CurlReceiveHeaderCallback, errorCode,
                         errorInfo, "header function set 0 error");
@@ -235,6 +235,7 @@ void initCurlRequestHeader(CURL *curl, struct curl_slist *headerList, CURLcode *
 }
 
 void initCurlRequestUrl(CURL *curl, const char *url, CURLcode *errorCode, const char **errorInfo) {
+    kCurlLogD("== url:%s", url);
     if (url != NULL) {
         qn_curl_easy_setopt(curl, CURLOPT_URL, url, errorCode, errorInfo, "url set error");
     }
@@ -477,7 +478,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_qiniu_curl_Curl_requestNative(JNIEnv 
     curl_perform_complete:
     handleResponse(&curlContext, curl);
     handleMetrics(&curlContext, curl);
-    kCurlLogD("== Curl Debug: 8 %d %s", errorCode, errorInfo);
+    kCurlLogD("== Curl Debug: 8    error code:%d %s", errorCode, errorInfo);
     completeWithError(&curlContext, errorCode, reinterpret_cast<const char *>(&errorInfo));
 
     if (dnsResolver != NULL) {
