@@ -24,7 +24,7 @@ android {
     buildToolsVersion '29.0.2'
     defaultConfig {
         //applicationId "com.qiniu.android"
-        minSdkVersion 15
+        minSdkVersion 21
         targetSdkVersion 26
         versionCode code
         versionName version
@@ -47,10 +47,17 @@ android {
     useLibrary 'android.test.runner'
     useLibrary 'android.test.base'
     useLibrary 'android.test.mock'
+
+    repositories {
+        jcenter()
+        mavenLocal()
+    }
 }
 
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.2.2'
+    implementation 'com.qiniu:upload-base:1.0.0'
+    implementation 'com.qiniu:curl-android:1.0.0'
     implementation 'com.qiniu:happy-dns:0.2.16'
     // for javax.annotation.Nullable use in custom MultipartBody and Headers implements.
 //    implementation 'com.google.code.findbugs:jsr305:3.0.2'
@@ -58,7 +65,6 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
     testImplementation 'junit:junit:4.13'
-    implementation project(path: ':curl')
 //    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 }
 

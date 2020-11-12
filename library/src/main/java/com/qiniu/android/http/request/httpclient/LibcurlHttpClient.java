@@ -1,5 +1,7 @@
 package com.qiniu.android.http.request.httpclient;
 
+import android.util.Log;
+
 import com.qiniu.android.common.Constants;
 import com.qiniu.android.http.ProxyConfiguration;
 import com.qiniu.android.http.ResponseInfo;
@@ -8,15 +10,16 @@ import com.qiniu.android.http.request.IRequestClient;
 import com.qiniu.android.http.request.Request;
 import com.qiniu.android.utils.AsyncRun;
 import com.qiniu.android.utils.StringUtils;
+
 import com.qiniu.curl.Curl;
 import com.qiniu.curl.CurlConfiguration;
 import com.qiniu.curl.CurlHandlerI;
+import com.qiniu.curl.CurlRequest;
 import com.qiniu.curl.CurlResponse;
 import com.qiniu.curl.CurlTransactionMetrics;
 
 import org.json.JSONObject;
 
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -42,24 +45,23 @@ public class LibcurlHttpClient implements IRequestClient {
 
         final CurlConfiguration.Builder configurationBuilder = new CurlConfiguration.Builder();
 
+        Log.d("", "== CURL request url:" + request.urlString + " ip:" + request.ip);
+
         // dns
-        if (request.getInetAddress() != null){
-            InetAddress inetAddress = request.getInetAddress();
-            String ip = inetAddress.getHostAddress();
-            String host = inetAddress.getHostName();
-            if (ip != null && host != null){
-                String dnsResolver = host + ":" + ip;
-                configurationBuilder.dnsResolverArray = new String[]{dnsResolver};
-            }
+        if (request.ip != null && request.host != null){
+                CurlConfiguration.DnsResolver dnsResolver = new CurlConfiguration.DnsResolver(request.host, request.ip, request.isHttps() ? 443 : 80);
+                configurationBuilder.setDnsResolverArray(new CurlConfiguration.DnsResolver[]{dnsResolver});
         }
 
         // proxy
         if (connectionProxy != null){
             if (connectionProxy.hostAddress != null){
-                configurationBuilder.proxy = connectionProxy.hostAddress + ":" + connectionProxy.port;
+                String proxy = connectionProxy.hostAddress + ":" + connectionProxy.port;
+                configurationBuilder.setProxy(proxy);
             }
             if (connectionProxy.user != null && connectionProxy.password != null){
-                configurationBuilder.proxyUserPwd = connectionProxy.user + ":" + connectionProxy.password;
+                String proxyUserPwd = connectionProxy.user + ":" + connectionProxy.password;
+                configurationBuilder.setProxyUserPwd(proxyUserPwd);
             }
         }
 
@@ -101,7 +103,7 @@ public class LibcurlHttpClient implements IRequestClient {
                          final RequestClientCompleteHandler complete){
 
         String url = request.urlString;
-        long method = 1;
+        int method = 1;
         if (request.httpMethod.equals("Get")){
             method = 1;
         } else if (request.httpMethod.equals("POST")){
@@ -112,10 +114,11 @@ public class LibcurlHttpClient implements IRequestClient {
         Map<String, String> header = request.allHeaders;
         byte[] body = request.httpBody;
 
+        CurlRequest curlRequest = new CurlRequest(url, method, header, body, request.timeout);
         httpClient = new Curl();
         curlGlobalInit(httpClient);
 
-        httpClient.request(new CurlHandlerI() {
+        httpClient.request(curlRequest, curlConfiguration, new CurlHandlerI() {
             @Override
             public void receiveResponse(CurlResponse curlResponse) {
                 response = curlResponse;
@@ -129,8 +132,8 @@ public class LibcurlHttpClient implements IRequestClient {
                         return new byte[0];
                     }
 
-                    long sendLength = Math.min(lastLength, dataLength);
-                    byte[] sendData = Arrays.copyOfRange(request.httpBody, (int)dataHasSent, (int)sendLength);
+                    int sendLength = (int)Math.min(lastLength, dataLength);
+                    byte[] sendData = Arrays.copyOfRange(request.httpBody, (int)dataHasSent, (int)dataHasSent + sendLength);
                     dataHasSent += sendLength;
                     return sendData;
                 } else {
@@ -151,19 +154,30 @@ public class LibcurlHttpClient implements IRequestClient {
             }
 
             @Override
-            public void completeWithError(int errorCode, String errorInfo) {
-                if (errorCode == 0){
-                    handleResponse(request, response, responseBody, complete);
-                } else {
-                    handleError(request, errorCode, errorInfo, complete);
-                }
+            public void completeWithError(final int errorCode, final String errorInfo) {
+
+                AsyncRun.runInMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (errorCode == 0){
+                            handleResponse(request, response, responseBody, complete);
+                        } else {
+                            handleError(request, errorCode, errorInfo, complete);
+                        }
+                    }
+                });
             }
 
             @Override
-            public void sendProgress(long bytesSent, long totalBytesSent, long totalBytesExpectedToSend) {
-                if (progress != null){
-                    progress.progress(totalBytesSent, totalBytesExpectedToSend);
-                }
+            public void sendProgress(long bytesSent, final long totalBytesSent, final long totalBytesExpectedToSend) {
+                AsyncRun.runInMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (progress != null){
+                            progress.progress(totalBytesSent, totalBytesExpectedToSend);
+                        }
+                    }
+                });
             }
 
             @Override
@@ -176,7 +190,7 @@ public class LibcurlHttpClient implements IRequestClient {
 
             }
 
-        }, curlConfiguration, url, method, header, body);
+        });
     }
 
     private synchronized void handleError(Request request,
@@ -189,6 +203,7 @@ public class LibcurlHttpClient implements IRequestClient {
 
         ResponseInfo info = ResponseInfo.create(request, responseCode, null,null, errorMsg);
         metrics.response = info;
+
         complete.complete(info, metrics, info.response);
 
         releaseResource();
@@ -218,7 +233,7 @@ public class LibcurlHttpClient implements IRequestClient {
 
         if (responseBody == null){
             errorMessage = "no response body";
-        } else if (!response.mimeType.equals(JsonMime)){
+        } else if (response.mimeType != null || !response.mimeType.equals(JsonMime)){
             String responseString = new String(responseBody);
             if (responseString.length() > 0){
                 try {
