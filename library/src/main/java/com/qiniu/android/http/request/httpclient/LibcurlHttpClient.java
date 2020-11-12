@@ -11,12 +11,13 @@ import com.qiniu.android.http.request.Request;
 import com.qiniu.android.utils.AsyncRun;
 import com.qiniu.android.utils.StringUtils;
 
-import com.qiniu.curl.Curl;
-import com.qiniu.curl.CurlConfiguration;
-import com.qiniu.curl.CurlHandlerI;
-import com.qiniu.curl.CurlRequest;
-import com.qiniu.curl.CurlResponse;
-import com.qiniu.curl.CurlTransactionMetrics;
+import com.qiniu.library.CurlAPI.CurlAPI;
+import com.qiniu.library.CurlAPI.ICurl;
+import com.qiniu.library.CurlAPI.ICurlConfiguration;
+import com.qiniu.library.CurlAPI.ICurlHandler;
+import com.qiniu.library.CurlAPI.ICurlRequest;
+import com.qiniu.library.CurlAPI.ICurlResponse;
+import com.qiniu.library.CurlAPI.ICurlTransactionMetrics;
 
 import org.json.JSONObject;
 
@@ -28,9 +29,9 @@ public class LibcurlHttpClient implements IRequestClient {
 
     public static final String JsonMime = "application/json";
 
-    private Curl httpClient;
+    private ICurl httpClient;
     private long dataHasSent;
-    private CurlResponse response;
+    private ICurlResponse response;
     private byte[] responseBody;
     private UploadSingleRequestMetrics metrics;
 
@@ -43,14 +44,15 @@ public class LibcurlHttpClient implements IRequestClient {
 
         initData();
 
-        final CurlConfiguration.Builder configurationBuilder = new CurlConfiguration.Builder();
+        final ICurlConfiguration.IBuilder configurationBuilder = CurlAPI.getCurlConfigurationBuilderObject();
 
         Log.d("", "== CURL request url:" + request.urlString + " ip:" + request.ip);
 
         // dns
         if (request.ip != null && request.host != null){
-                CurlConfiguration.DnsResolver dnsResolver = new CurlConfiguration.DnsResolver(request.host, request.ip, request.isHttps() ? 443 : 80);
-                configurationBuilder.setDnsResolverArray(new CurlConfiguration.DnsResolver[]{dnsResolver});
+                ICurlConfiguration.IDnsResolver dnsResolver = CurlAPI.getCurlConfigurationDnsResolverObject();
+                dnsResolver.init(request.host, request.ip, request.isHttps() ? 443 : 80);
+                configurationBuilder.setDnsResolverArray(new ICurlConfiguration.IDnsResolver[]{dnsResolver});
         }
 
         // proxy
@@ -90,14 +92,14 @@ public class LibcurlHttpClient implements IRequestClient {
     }
 
     private static boolean hasCurlGlobalInit = false;
-    private synchronized void curlGlobalInit(Curl curl){
+    private synchronized void curlGlobalInit(ICurl curl){
         if (!hasCurlGlobalInit){
             hasCurlGlobalInit = true;
             curl.globalInit();
         }
     }
 
-    private void request(CurlConfiguration curlConfiguration,
+    private void request(ICurlConfiguration curlConfiguration,
                          final Request request,
                          final RequestClientProgress progress,
                          final RequestClientCompleteHandler complete){
@@ -114,13 +116,15 @@ public class LibcurlHttpClient implements IRequestClient {
         Map<String, String> header = request.allHeaders;
         byte[] body = request.httpBody;
 
-        CurlRequest curlRequest = new CurlRequest(url, method, header, body, request.timeout);
-        httpClient = new Curl();
+        ICurlRequest curlRequest = CurlAPI.getCurlRequestObject();
+        curlRequest.init(url, method, header, body, request.timeout);
+
+        httpClient = CurlAPI.getCurlObject();
         curlGlobalInit(httpClient);
 
-        httpClient.request(curlRequest, curlConfiguration, new CurlHandlerI() {
+        httpClient.request(curlRequest, curlConfiguration, new ICurlHandler() {
             @Override
-            public void receiveResponse(CurlResponse curlResponse) {
+            public void receiveResponse(ICurlResponse curlResponse) {
                 response = curlResponse;
             }
 
@@ -186,7 +190,7 @@ public class LibcurlHttpClient implements IRequestClient {
             }
 
             @Override
-            public void didFinishCollectingMetrics(CurlTransactionMetrics curlMetrics) {
+            public void didFinishCollectingMetrics(ICurlTransactionMetrics curlMetrics) {
 
             }
 
@@ -210,20 +214,20 @@ public class LibcurlHttpClient implements IRequestClient {
     }
 
     private synchronized void handleResponse(Request request,
-                                             CurlResponse response,
+                                             ICurlResponse response,
                                              byte[] responseBody,
                                              RequestClientCompleteHandler complete){
         if (metrics == null || metrics.response != null) {
             return;
         }
 
-        int statusCode = response.statusCode;
+        int statusCode = response.getStatusCode();
 
         HashMap<String, String> responseHeader = new HashMap<String, String>();
-        if (response.allHeaderFields != null){
-            for (String key : response.allHeaderFields.keySet()) {
+        if (response.getAllHeaderFields() != null){
+            for (String key : response.getAllHeaderFields().keySet()) {
                 String name = key.toLowerCase();
-                String value = response.allHeaderFields.get(key);
+                String value = response.getAllHeaderFields().get(key);
                 responseHeader.put(name, value);
             }
         }
@@ -233,7 +237,7 @@ public class LibcurlHttpClient implements IRequestClient {
 
         if (responseBody == null){
             errorMessage = "no response body";
-        } else if (response.mimeType != null || !response.mimeType.equals(JsonMime)){
+        } else if (response.getMimeType() != null || !response.getMimeType().equals(JsonMime)){
             String responseString = new String(responseBody);
             if (responseString.length() > 0){
                 try {
