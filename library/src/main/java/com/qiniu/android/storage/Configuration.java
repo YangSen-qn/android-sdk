@@ -90,6 +90,11 @@ public final class Configuration {
      */
     public final UrlConverter urlConverter;
 
+    /**
+     *  是否启用HTTP/3
+     *  当服务支持HTTP3时，优先使用HTTP/3
+     */
+    public final boolean useHTTP3;
 
     private Configuration(Builder builder) {
         chunkSize = builder.chunkSize;
@@ -111,6 +116,7 @@ public final class Configuration {
         urlConverter = builder.urlConverter;
 
         useHttps = builder.useHttps;
+        useHTTP3 = builder.useHTTP3;
 
         useConcurrentResumeUpload = builder.useConcurrentResumeUpload;
         concurrentTaskCount = builder.concurrentTaskCount;
@@ -147,6 +153,7 @@ public final class Configuration {
         private UrlConverter urlConverter = null;
         private boolean useConcurrentResumeUpload = false;
         private int concurrentTaskCount = 3;
+        private boolean useHTTP3 = false;
 
         public Builder zone(Zone zone) {
             this.zone = zone;
@@ -221,6 +228,11 @@ public final class Configuration {
 
         public Builder useHttps(boolean useHttps) {
             this.useHttps = useHttps;
+            return this;
+        }
+
+        public Builder useHttp3(boolean useHttp3) {
+            this.useHTTP3 = useHTTP3;
             return this;
         }
 

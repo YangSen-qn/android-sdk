@@ -12,9 +12,11 @@ import com.qiniu.android.http.request.handler.RequestProgressHandler;
 import com.qiniu.android.http.request.handler.RequestShouldRetryHandler;
 import com.qiniu.android.http.metrics.UploadSingleRequestMetrics;
 import com.qiniu.android.storage.Configuration;
+import com.qiniu.android.storage.GlobalConfiguration;
 import com.qiniu.android.storage.UpToken;
 import com.qiniu.android.storage.UploadOptions;
 import com.qiniu.android.utils.Utils;
+import com.yangsen.library.CurlAPI.CurlAPI;
 
 import org.json.JSONObject;
 
@@ -65,13 +67,11 @@ class HttpSingleRequest {
                               final RequestProgressHandler progressHandler,
                               final RequestCompleteHandler completeHandler){
 
-        if (toSkipDns){
-            client = new SystemHttpClient();
+        if (config.useHTTP3 && CurlAPI.isCurlLoad()){
+            client = new LibcurlHttpClient();
         } else {
             client = new SystemHttpClient();
         }
-
-        client = new LibcurlHttpClient();
 
         final CheckCancelHandler checkCancelHandler = new CheckCancelHandler() {
             @Override
