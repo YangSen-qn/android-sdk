@@ -16,6 +16,11 @@ public class Constants {
     public static final String NETWORK_WIFI = "wifi";
 
     /**
+     * mobile network (2G/3G/4G/5G, without precise classification)
+     */
+    public static final String NETWORK_CLASS_MOBILE = "mobile";
+
+    /**
      * "2G" networks
      */
     public static final String NETWORK_CLASS_2_G = "2g";

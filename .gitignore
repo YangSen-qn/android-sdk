@@ -40,5 +40,10 @@ java_pid*
 library/library.iml
 .idea/*
 
-# Claude Code
-.claude/
+# AI tool settings
+.claude/settings.local.json
+!.claude/skills
+!.trae/skills
+!.trae/rules
+!.kiro/skills
+!.kiro/steering
