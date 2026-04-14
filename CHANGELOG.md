@@ -1,4 +1,12 @@
 #Changelog
+## 8.11.0（2026-04-14）
+* 调整
+  * 重构网络类型判断逻辑，API 29+ 使用 NetworkCapabilities，API 1-28 使用 TelephonyManager 细分蜂窝代际
+  * 优化权限声明，移除 ACCESS_WIFI_STATE、READ_EXTERNAL_STORAGE、WRITE_EXTERNAL_STORAGE，READ_PHONE_STATE 限制 maxSdkVersion 为 28
+  * 增加 NETWORK_CLASS_MOBILE 常量，无法细分蜂窝代际时统一返回 mobile
+  * 增加 5G 网络类型识别
+  * isNetWorkReady() 方法适配 NetworkCapabilities
+
 ## 8.10.0（2026-03-17）
 * 调整
   * 解耦 TransactionManager 定时器生命周期

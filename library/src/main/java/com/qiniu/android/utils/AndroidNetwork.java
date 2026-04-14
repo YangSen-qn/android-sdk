@@ -127,12 +127,13 @@ public final class AndroidNetwork {
             return networkType;
         }
 
-        // 此接口需要 23+，但返回信息不详细，所以上面优先使用 getNetworkTypeByTelephony
+        // API 23+ 使用 NetworkCapabilities（无需 READ_PHONE_STATE 权限）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             return getNetworkClassByConnectivity(context);
         }
 
-        return Constants.NETWORK_CLASS_UNKNOWN;
+        // API < 23 使用旧版 ConnectivityManager 判断 WiFi / 移动网络
+        return getNetworkClassByLegacyConnectivity(context);
     }
 
     /**
@@ -178,6 +179,35 @@ public final class AndroidNetwork {
             case TelephonyManager.NETWORK_TYPE_NR:
                 return Constants.NETWORK_CLASS_5_G;
 
+            default:
+                return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+    }
+
+    /**
+     * 使用旧版 ConnectivityManager 获取网络类型
+     * 适用于 API < 23（NetworkCapabilities 不可用）的场景
+     *./
+     * @param context context
+     * @return 网络类型
+     */
+    @SuppressWarnings("deprecation")
+    private static String getNetworkClassByLegacyConnectivity(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (info == null || !info.isConnected()) {
+            return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+
+        switch (info.getType()) {
+            case ConnectivityManager.TYPE_WIFI:
+                return Constants.NETWORK_WIFI;
+            case ConnectivityManager.TYPE_MOBILE:
+                return Constants.NETWORK_CLASS_MOBILE;
             default:
                 return Constants.NETWORK_CLASS_UNKNOWN;
         }
