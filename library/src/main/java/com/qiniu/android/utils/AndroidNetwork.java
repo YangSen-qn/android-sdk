@@ -5,25 +5,18 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Process;
-import android.telephony.CellInfo;
-import android.telephony.CellInfoCdma;
-import android.telephony.CellInfoGsm;
-import android.telephony.CellInfoLte;
-import android.telephony.CellInfoWcdma;
-import android.telephony.CellSignalStrengthCdma;
-import android.telephony.CellSignalStrengthGsm;
-import android.telephony.CellSignalStrengthLte;
-import android.telephony.CellSignalStrengthWcdma;
 import android.telephony.TelephonyManager;
+
+import androidx.annotation.RequiresApi;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
-import java.util.List;
 
 /**
  * Created by bailong on 16/9/7.
@@ -47,7 +40,15 @@ public final class AndroidNetwork {
         }
         ConnectivityManager connMgr = (ConnectivityManager)
                 c.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connMgr == null) {
+            return true;
+        }
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                NetworkCapabilities caps = connMgr.getNetworkCapabilities(connMgr.getActiveNetwork());
+                return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            }
+
             NetworkInfo info = connMgr.getActiveNetworkInfo();
             return info != null && info.isConnected();
         } catch (Exception e) {
@@ -65,14 +66,14 @@ public final class AndroidNetwork {
     public static String getHostIP() {
         String hostIp = null;
         try {
-            Enumeration nis = NetworkInterface.getNetworkInterfaces();
+            Enumeration<NetworkInterface> nis = NetworkInterface.getNetworkInterfaces();
             if (nis == null) {
                 return null;
             }
 
             InetAddress ia = null;
             while (nis.hasMoreElements()) {
-                NetworkInterface ni = (NetworkInterface) nis.nextElement();
+                NetworkInterface ni = nis.nextElement();
                 Enumeration<InetAddress> ias = ni.getInetAddresses();
                 while (ias.hasMoreElements()) {
                     ia = ias.nextElement();
@@ -80,7 +81,6 @@ public final class AndroidNetwork {
                         hostIp = ia.getHostAddress();
                         break;
                     }
-                    continue;
                 }
             }
         } catch (SocketException e) {
@@ -96,45 +96,55 @@ public final class AndroidNetwork {
      * {@link  Constants#NETWORK_CLASS_2_G}
      * {@link  Constants#NETWORK_CLASS_3_G}
      * {@link  Constants#NETWORK_CLASS_4_G}
-     * ...
+     * {@link  Constants#NETWORK_CLASS_5_G}
+     * {@link  Constants#NETWORK_CLASS_MOBILE}
      *
      * @param context context
      * @return 网络类型
      */
     public static String networkType(Context context) {
         try {
-            return networkTypeWithException(context);
+            return getNetWorkClass(context);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
     }
 
-    private static String networkTypeWithException(Context context) throws Exception {
+    private static String getNetWorkClass(Context context) {
         if (context == null) {
             return Constants.NETWORK_CLASS_UNKNOWN;
         }
 
-        ConnectivityManager connectivity = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivity == null) {
-            return Constants.NETWORK_CLASS_UNKNOWN;
+        // API 29+ getNetworkType() 已废弃，直接用 NetworkCapabilities
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return getNetworkClassByConnectivity(context);
         }
 
-        NetworkInfo networkInfo = connectivity.getActiveNetworkInfo();
-        if (networkInfo == null || !networkInfo.isConnected()) {
-            return Constants.NETWORK_CLASS_UNKNOWN;
+        // API 1-28 优先用 TelephonyManager，结果为 unknown 时降级
+        String networkType = getNetworkTypeByTelephony(context);
+        if (networkType != null && !Constants.NETWORK_CLASS_UNKNOWN.equals(networkType)) {
+            return networkType;
         }
 
-        int netWorkType = networkInfo.getType();
-        if (netWorkType == ConnectivityManager.TYPE_WIFI) {
-            return Constants.NETWORK_WIFI;
-        } else if (netWorkType == ConnectivityManager.TYPE_MOBILE) {
-            return getNetWorkClass(context);
+        // API 23+ 使用 NetworkCapabilities（无需 READ_PHONE_STATE 权限）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return getNetworkClassByConnectivity(context);
         }
-        return Constants.NETWORK_CLASS_UNKNOWN;
+
+        // API < 23 使用旧版 ConnectivityManager 判断 WiFi / 移动网络
+        return getNetworkClassByLegacyConnectivity(context);
     }
 
-    private static String getNetWorkClass(Context context) {
+    /**
+     * 通过 TelephonyManager 获取网络类型（2G/3G/4G/5G）
+     * API < 23 时无需权限，API 23-28 需要 READ_PHONE_STATE 权限
+     *
+     * @param context context
+     * @return 网络类型
+     */
+    @SuppressLint("MissingPermission")
+    private static String getNetworkTypeByTelephony(Context context) {
         if (context.checkPermission(Manifest.permission.READ_PHONE_STATE, Process.myPid(), Process.myUid()) != PackageManager.PERMISSION_GRANTED) {
             return Constants.NETWORK_CLASS_UNKNOWN;
         }
@@ -166,12 +176,69 @@ public final class AndroidNetwork {
             case TelephonyManager.NETWORK_TYPE_LTE:
                 return Constants.NETWORK_CLASS_4_G;
 
-
             case TelephonyManager.NETWORK_TYPE_NR:
                 return Constants.NETWORK_CLASS_5_G;
 
             default:
                 return Constants.NETWORK_CLASS_UNKNOWN;
         }
+    }
+
+    /**
+     * 使用旧版 ConnectivityManager 获取网络类型
+     * 适用于 API < 23（NetworkCapabilities 不可用）的场景
+     *./
+     * @param context context
+     * @return 网络类型
+     */
+    @SuppressWarnings("deprecation")
+    private static String getNetworkClassByLegacyConnectivity(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (info == null || !info.isConnected()) {
+            return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+
+        switch (info.getType()) {
+            case ConnectivityManager.TYPE_WIFI:
+                return Constants.NETWORK_WIFI;
+            case ConnectivityManager.TYPE_MOBILE:
+                return Constants.NETWORK_CLASS_MOBILE;
+            default:
+                return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+    }
+
+    /**
+     * 使用 NetworkCapabilities 获取网络类型（无需 READ_PHONE_STATE 权限）
+     * API 23+
+     *
+     * @param context context
+     * @return 网络类型
+     */
+    @RequiresApi(Build.VERSION_CODES.M)
+    private static String getNetworkClassByConnectivity(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+
+        NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        if (caps == null) {
+            return Constants.NETWORK_CLASS_UNKNOWN;
+        }
+
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            return Constants.NETWORK_WIFI;
+        }
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+            // 无法细分 2G/3G/4G/5G，统一返回 mobile
+            return Constants.NETWORK_CLASS_MOBILE;
+        }
+        return Constants.NETWORK_CLASS_UNKNOWN;
     }
 }
